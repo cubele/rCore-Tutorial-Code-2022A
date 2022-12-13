@@ -1,0 +1,89 @@
+name: GitHub Classroom Workflow
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Autograding
+    runs-on: ubuntu-latest
+    outputs:
+      details: ${{ steps.autograding.outputs.details }}
+      points: ${{ steps.autograding.outputs.points }}
+      finished_lab: ${{ env.FINISHED_LAB }}
+    steps:
+      - uses: actions/checkout@v3
+        # with:
+        #   submodules: recursive
+
+      - name: Cache docker
+        uses: actions/cache@v3
+        with:
+          path: /var/lib/docker
+          key: ${{ runner.os }}-docker
+
+      - name: Build and Test in docker
+        uses: ./.github/actions/qemu
+
+      - name: Prepare os-autograding
+        run: |
+          mkdir .github/classroom
+          make setup-conf
+          cp -r conf/autograding/* .github/classroom
+
+      - name: os-autograding
+        id: autograding
+        uses: yfblock/os-autograding@master
+        with:
+          outputFile: qemu_run_output.txt
+          scriptPath: .github/classroom
+
+      - name: Load ENV
+        id: load-env
+        uses: duskmoon314/action-load-env@v1
+        with:
+          files: .env
+
+  deploy:
+    name: Deploy to pages
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        continue-on-error: true
+        with:
+          ref: 'gh-pages'
+      - name: Save Log File
+        continue-on-error: true
+        run: |
+          mkdir autograding_logs
+          cd autograding_logs
+          if [  -f "../latest.json"  ]; then
+              cp ../latest.json older.json
+          else
+              echo "{}" > older.json
+          fi
+          FILE_NAME=`date +%Y_%m_%d_%H_%M_%S`.txt
+          echo -ne "${{ needs.test.outputs.details }}\n" > $FILE_NAME
+          echo -ne "Points: ${{ needs.test.outputs.points }}" > $FILE_NAME
+          cat older.json | jq ".${{ needs.test.outputs.finished_lab }} |= \"$FILE_NAME\"" > latest.json
+          rm older.json
+          echo -ne "# Got Points\n" > README.md
+          echo "![Points bar](../../blob/gh-pages/points-badge.svg)" >> README.md
+      - name: Make points svg
+        uses: markpatterson27/points-bar@v1
+        with:
+          points: '${{ needs.test.outputs.points }}'
+          path: 'autograding_logs/points-badge.svg'
+          type: 'badge'
+      - name: GitHub Pages
+        uses: crazy-max/ghaction-github-pages@v3
+        with:
+          target_branch: gh-pages
+          build_dir: autograding_logs
+          keep_history: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,10 @@
+default:
+  image: duskmoon/dev-env:rcore-ci
+
+stages:
+  - test
+
+test-code-job:
+  stage: test
+  script:
+    - TEST_REPO="https://token:${RCORE_TEST_REPO_READ_TOKEN}@git.tsinghua.edu.cn/os-lab/public/rcore-tutorial-test-2022a.git" make ci-test
