@@ -112,9 +112,17 @@ pub fn frame_alloc() -> Option<FrameTracker> {
         .map(FrameTracker::new)
 }
 
+pub fn raw_frame_alloc() -> Option<PhysAddr> {
+    FRAME_ALLOCATOR.exclusive_access().alloc().map(|ppn| ppn.into())
+}
+
 /// deallocate a frame
 pub fn frame_dealloc(ppn: PhysPageNum) {
     FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
+}
+
+pub fn raw_frame_dealloc(pa: PhysAddr) {
+    FRAME_ALLOCATOR.exclusive_access().dealloc(pa.into());
 }
 
 #[allow(unused)]

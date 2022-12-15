@@ -19,6 +19,7 @@
 #![no_main]
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
+#![feature(asm_const)]
 
 #[macro_use]
 extern crate bitflags;
@@ -41,6 +42,7 @@ mod syscall;
 mod task;
 mod timer;
 mod trap;
+mod probe;
 
 core::arch::global_asm!(include_str!("entry.asm"));
 
@@ -70,6 +72,7 @@ pub fn rust_main() -> ! {
     // Uncomment following lines and see what happens!
     // task::kernel_stackless_coroutine_test();
     // task::kernel_stackful_coroutine_test();
+    probe::run_tests();
     fs::list_apps();
     task::add_initproc();
     task::run_tasks();

@@ -24,7 +24,7 @@ use crate::timer::{check_timer, set_next_trigger};
 use riscv::register::{
     mtvec::TrapMode,
     scause::{self, Exception, Interrupt, Trap},
-    sie, stval, stvec,
+    sie, stval, stvec, sscratch,
 };
 
 core::arch::global_asm!(include_str!("trap.S"));
@@ -34,8 +34,14 @@ pub fn init() {
 }
 
 fn set_kernel_trap_entry() {
+    extern "C" {
+        fn __alltraps();
+        fn __alltraps_k();
+    }
+    let __alltraps_k_va = __alltraps_k as usize - __alltraps as usize + TRAMPOLINE;
     unsafe {
-        stvec::write(trap_from_kernel as usize, TrapMode::Direct);
+        stvec::write(__alltraps_k_va, TrapMode::Direct);
+        sscratch::write(trap_from_kernel as usize);
     }
 }
 
@@ -125,9 +131,27 @@ pub fn trap_return() -> ! {
     }
 }
 
+extern "C" {
+    fn kprobes_breakpoint_handler(_trap_cx: &TrapContext);
+}
+
 #[no_mangle]
-pub fn trap_from_kernel() -> ! {
-    panic!("a trap {:?} from kernel!", scause::read().cause());
+pub fn trap_from_kernel(_trap_cx: &TrapContext) {
+    let scause = scause::read();
+    let stval = stval::read();
+    match scause.cause() {
+        Trap::Exception(Exception::Breakpoint) => {
+            println!("[kernel] breakpoint at {:#x}", _trap_cx.sepc);
+            unsafe {kprobes_breakpoint_handler(_trap_cx);}
+        }
+        _ => {
+            panic!(
+                "Unsupported trap from kernel: {:?}, stval = {:#x}!",
+                scause.cause(),
+                stval
+            );
+        }
+    }
 }
 
 pub use context::TrapContext;
