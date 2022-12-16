@@ -1,7 +1,6 @@
 pub mod kprobes;
 pub mod kretprobes;
 pub mod osutils;
-
 pub use osutils::init_osutils;
 
 use kprobes::{Handler, HandlerFn};
@@ -10,7 +9,7 @@ use alloc::sync::Arc;
 
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 #[path = "arch/riscv/mod.rs"]
-mod arch;
+pub mod arch;
 
 pub struct KProbeArgs {
     pub pre_handler: Arc<Handler>,

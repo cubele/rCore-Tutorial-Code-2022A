@@ -25,7 +25,7 @@
 extern crate bitflags;
 #[macro_use]
 extern crate log;
-
+#[macro_use]
 extern crate alloc;
 
 #[macro_use]
@@ -43,6 +43,7 @@ mod task;
 mod timer;
 mod trap;
 mod probe;
+mod ebpf;
 
 core::arch::global_asm!(include_str!("entry.asm"));
 

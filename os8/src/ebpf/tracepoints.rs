@@ -2,13 +2,12 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
-use trapframe::TrapFrame;
-use crate::symbol::symbol_to_addr;
+use crate::probe::arch::trapframe::TrapFrame;
 
 
 use lock::Mutex;
 
-use crate::{probe::{register_kprobe, register_kretprobe, KProbeArgs, KRetProbeArgs}, error};
+use crate::{probe::{register_kprobe, register_kretprobe, KProbeArgs, KRetProbeArgs}};
 use super::{BpfObject::*, *, retcode::BpfErrorCode::{*, self}, retcode::*};
 
 #[repr(C)]
@@ -104,7 +103,8 @@ fn kretprobe_exit_handler(tf: &mut TrapFrame, probed_addr: usize) -> isize {
 }
 
 fn resolve_symbol(symbol: &str) -> Option<usize> {
-    symbol_to_addr(symbol)
+    panic!("resolve symbol need hardcoded symbol")
+    //symbol_to_addr(symbol)
 }
 
 fn parse_tracepoint<'a>(target: &'a str) -> Result<(TracepointType, &'a str), BpfErrorCode> {

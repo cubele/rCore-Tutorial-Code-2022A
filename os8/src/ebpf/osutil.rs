@@ -53,6 +53,10 @@ pub fn os_get_current_cpu() -> u8 {
     kernel_hal::cpu::cpu_id()
 }
 
+pub fn os_console_write_str(s: &str) {
+    
+}
+
 pub fn os_copy_from_user(usr_addr: usize, kern_buf: *mut u8, len: usize) -> i32 {
     let usr_ptr = usr_addr as *const u8;
     copy(kern_buf, usr_ptr, len);
