@@ -11,55 +11,62 @@ use super::{
     tracepoints::*,
 };
 
-use core::mem::size_of;
-use crate::ebpf::program::bpf_program_load_ex;
-use crate::object::{task::Thread, KernelObject};
+use core::{mem::size_of, fmt::Write};
+use super::program::bpf_program_load_ex;
+
 use alloc::sync::Arc;
 use alloc::string::String;
 use core::slice::{from_raw_parts, from_raw_parts_mut};
+use downcast_rs::{impl_downcast, DowncastSync};
 
-pub trait ThreadLike : Sync + Send {
+use crate::task::TaskControlBlock;
+
+pub trait ThreadLike : DowncastSync {
     fn get_pid(&self) -> u64;
     fn get_tid(&self) -> u64;
     fn get_name(&self) -> String;
 }
 
-impl ThreadLike for Thread {
+impl_downcast!(ThreadLike);
+
+impl ThreadLike for TaskControlBlock {
     fn get_pid(&self) -> u64 {
-        return self.proc().id();
+        let proc = self.process.upgrade().unwrap();
+        return proc.pid.0 as u64;
     }
     fn get_tid(&self) -> u64 {
-        return self.related_koid() as u64;
+        return 0; // no viable in rcore tutor
     }
     fn get_name(&self) -> String {
-        return String::from("not viable in zCore")
+        return String::from("not viable in rcore tutorial")
     }
 }
 
 pub fn os_current_thread() -> Arc<dyn ThreadLike> {
-    if let Some(thread) = kernel_hal::thread::get_current_thread() {
-        let ret = thread.downcast::<Thread>().unwrap();
-        ret
+    if let Some(thread) = crate::task::current_task() {
+        thread
     } else {
         panic!("cannot get current thread!")
     }
 }
 
 pub fn os_current_time() -> u128 {
-    kernel_hal::timer::timer_now().as_nanos()
+   crate::timer::get_time_us() as u128 * 1000
 }
 
 pub fn os_get_current_cpu() -> u8 {
-    kernel_hal::cpu::cpu_id()
+   0 // not viable
 }
 
 pub fn os_console_write_str(s: &str) {
-    
+    crate::console::Stdout.write_str(s).unwrap();
 }
 
 pub fn os_copy_from_user(usr_addr: usize, kern_buf: *mut u8, len: usize) -> i32 {
-    let usr_ptr = usr_addr as *const u8;
-    copy(kern_buf, usr_ptr, len);
+    use crate::mm::translated_byte_buffer;
+    use crate::task::current_user_token;
+    let t = translated_byte_buffer(current_user_token(), usr_addr as *const u8, len);
+    copy(kern_buf, t.as_ptr() as *const u8, len);
     0
 }
  
