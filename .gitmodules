@@ -1,0 +1,6 @@
+[submodule "ucore-test"]
+    path = ucore
+    url = git@github.com:livingshade/uCore-Tutorial-Test-2022A.git
+[submodule "rcore-test"]
+    path = ci-user
+    url = git@github.com:livingshade/rCore-Tutorial-Test-2022A.git
