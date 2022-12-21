@@ -103,8 +103,10 @@ fn kretprobe_exit_handler(tf: &mut TrapFrame, probed_addr: usize) -> isize {
 }
 
 fn resolve_symbol(symbol: &str) -> Option<usize> {
-    panic!("resolve symbol need hardcoded symbol")
+    //addr = 0x0000000080207b4a
+    //panic!("resolve symbol need hardcoded symbol")
     //symbol_to_addr(symbol)
+    Some(0x0000000080207b4a)
 }
 
 fn parse_tracepoint<'a>(target: &'a str) -> Result<(TracepointType, &'a str), BpfErrorCode> {

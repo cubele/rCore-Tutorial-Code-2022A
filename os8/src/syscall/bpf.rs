@@ -51,7 +51,7 @@ pub fn sys_bpf(cmd: isize, bpf_attr: usize , size: usize) -> isize {
             BPF_PROG_LOAD => todo!(),
             BPF_PROG_ATTACH => sys_bpf_program_attach(ptr, size),
             BPF_PROG_DETACH => todo!(),
-            BPF_PROG_LOAD_EX => sys_temp_bpf_program_load_ex(ptr, size),
+            BPF_PROG_LOAD_EX => sys_preprocess_bpf_program_load_ex(ptr, size),
         };
         if ret < 0 {
             -1
@@ -61,41 +61,4 @@ pub fn sys_bpf(cmd: isize, bpf_attr: usize , size: usize) -> isize {
     } else {
         -1
     }
-}
-
-#[allow(unused_mut)]
-fn sys_temp_bpf_program_load_ex(attr_ptr: *const u8, size: usize) -> i32 {
-    //trace!("load program ex");
-    // let ptr = UserInPtr::<ProgramLoadExAttr>::from(attr_ptr as usize);
-    // let attr = ptr.read().unwrap();
-    // // ELF relocatable object info
-    // let base = attr.elf_prog as *mut u8;
-    // let size = attr.elf_size as usize;
-    // let vm = self.zircon_process().vmar();
-    let mut prog = vec![0 as u8; size];
-    // let buf = &mut prog[..];
-    // let mut actual_read = vm.read_memory(base as usize, buf).unwrap();
-    // assert_eq!(actual_read, size);
-
-    // let arr_len = attr.map_array_len as usize;
-
-    // let mut map_fd_array = vec![0 as u8; arr_len * core::mem::size_of::<MapFdEntry>()];
-    // let buf = &mut map_fd_array[..];
-    // actual_read = vm.read_memory(attr.map_array as usize, buf).unwrap();
-    // assert_eq!(actual_read, arr_len * core::mem::size_of::<MapFdEntry>());
-
-
-    let mut map_info = alloc::vec::Vec::new();
-    // let start = buf.as_ptr() as *const MapFdEntry;
-    // for i in 0..arr_len {
-    //     unsafe {
-    //         let entry = &(*start.add(i));
-    //         let name_ptr = entry.name;
-    //         let map_name = read_null_terminated_str(name_ptr);
-    //         info!("insert map: {} fd: {}", map_name, entry.fd);
-    //         map_info.push((map_name, entry.fd));            
-    //     }   
-    // }
-
-    sys_bpf_program_load_ex(&mut prog[..], &map_info[..])
 }

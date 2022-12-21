@@ -9,10 +9,10 @@ use super::{
     retcode::BpfResult,
     tracepoints::KprobeAttachAttr,
     tracepoints::*,
+    program::{bpf_program_load_ex, ProgramLoadExAttr, MapFdEntry},
 };
 
 use core::{mem::size_of, fmt::Write, iter::Map};
-use super::program::bpf_program_load_ex;
 
 use alloc::sync::Arc;
 use alloc::string::String;
@@ -162,9 +162,13 @@ pub fn sys_bpf_map_get_next_key(attr: *const u8, size: usize) -> i32 {
 pub fn sys_bpf_program_attach(attr: *const u8, size: usize) -> i32 {
   //  assert_eq!(size, size_of::<KprobeAttachAttr>());
     let attach_attr: KprobeAttachAttr = get_generic_from_user(attr as usize);
+    let len = attach_attr.str_len as usize;
+    let mut target_name_buf = vec![0 as u8; len];
+    os_copy_from_user(attach_attr.target as usize, target_name_buf.as_mut_ptr(), len);
     let target_name = unsafe {
         core::str::from_utf8(
-            core::slice::from_raw_parts(attach_attr.target, attach_attr.str_len as usize)
+            target_name_buf.as_slice()
+           // core::slice::from_raw_parts(attach_attr.target, attach_attr.str_len as usize)
         ).unwrap()
     };
     trace!("target name str: {}", target_name);
@@ -176,5 +180,52 @@ pub fn sys_bpf_program_attach(attr: *const u8, size: usize) -> i32 {
 pub fn sys_bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> i32 {
     let ret = convert_result(bpf_program_load_ex(prog, &map_info));
     trace!("load ex ret: {}", ret);
+    ret
+}
+
+#[allow(unused_mut)]
+pub fn sys_preprocess_bpf_program_load_ex(attr_ptr: *const u8, size: usize) -> i32 {
+    trace!("load program ex");
+
+    let attr:ProgramLoadExAttr = get_generic_from_user(attr_ptr as usize);
+
+    info!("prog attr\n prog_base:{:x} prog_size={} map_base:{:x} map_num={}", attr.elf_prog, attr.elf_size, attr.map_array as usize, attr.map_array_len);
+    let base = attr.elf_prog as usize;
+    let size = attr.elf_size as usize;
+    let mut prog = vec![0 as u8; size];
+    os_copy_from_user(base, prog.as_mut_ptr(), size);
+
+    let arr_len = attr.map_array_len as usize;
+    let arr_size = arr_len * core::mem::size_of::<MapFdEntry>();
+    let mut map_fd_array = vec![0 as u8; arr_size];
+    if arr_size > 0 {
+        os_copy_from_user(attr.map_array as usize, map_fd_array.as_mut_ptr(), arr_size);
+    }
+
+    let mut map_info = alloc::vec::Vec::new();
+    let start = map_fd_array.as_ptr() as *const MapFdEntry;
+    for i in 0..arr_len {
+        unsafe {
+            let entry = &(*start.add(i));
+            let name_ptr = entry.name;
+            let map_name = read_null_terminated_str(name_ptr);
+            info!("insert map: {} fd: {}", map_name, entry.fd);
+            map_info.push((map_name, entry.fd));            
+        }   
+    }
+
+    sys_bpf_program_load_ex(&mut prog[..], &map_info[..])
+}
+
+unsafe fn read_null_terminated_str(mut ptr: *const u8) -> String {
+    let mut ret = String::new();
+    loop {
+        let c: char = get_generic_from_user(ptr as usize);
+        if c == '\n' || c == '\0' {
+            break;
+        }
+        ret.push(c);
+        ptr = ptr.add(1);
+    }
     ret
 }
