@@ -145,11 +145,14 @@ pub fn trap_from_kernel(_trap_cx: &TrapContext) {
             unsafe {kprobes_breakpoint_handler(_trap_cx);}
         }
         _ => {
-            panic!(
+            error!(
                 "Unsupported trap from kernel: {:?}, stval = {:#x}!",
                 scause.cause(),
                 stval
             );
+            loop {
+                
+            }
         }
     }
 }

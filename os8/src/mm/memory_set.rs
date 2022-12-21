@@ -232,7 +232,6 @@ impl MemorySet {
                 dst_ppn
                     .get_bytes_array()
                     .copy_from_slice(src_ppn.get_bytes_array());
-                info!("src:{:?} dst:{:?} vpn:{:?}", src_ppn, dst_ppn, vpn);
             }
         }
         memory_set
