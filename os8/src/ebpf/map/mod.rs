@@ -1,3 +1,5 @@
+use core::mem::copy;
+
 use lock::Mutex;
 use alloc::sync::Arc;
 
@@ -92,11 +94,12 @@ pub fn bpf_map_ops(fd: u32, op: BpfMapOp, key: *const u8, value: *mut u8, flags:
     let mut map = shared_map.lock();
     let key_size = map.get_attr().key_size;
     let value_size = map.get_attr().value_size;
-
-    let mut key_kern_buf = alloc::vec![0 as u8; key_size];
-    let kptr = key_kern_buf.as_mut_ptr();
-    os_copy_from_user(key as usize, kptr, key_size);
-
+    // trace!("get map ks:{}, vs:{}", key_size, value_size);
+    // let mut key_kern_buf = alloc::vec![0 as u8; key_size];
+    // let kptr = key_kern_buf.as_mut_ptr();
+    // trace!("kptr :{:x}", kptr as usize);
+    // //os_copy_from_user(key as usize, kptr, key_size);
+    // trace!("copied key");
 
     let mut value_kern_buf = alloc::vec![0 as u8; value_size];
     let vptr = value_kern_buf.as_mut_ptr();

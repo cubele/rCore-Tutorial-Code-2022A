@@ -139,7 +139,7 @@ impl MemorySet {
                 (sbss_with_stack as usize).into(),
                 (ebss as usize).into(),
                 MapType::Identical,
-                MapPermission::R | MapPermission::W,
+                MapPermission::R | MapPermission::W | MapPermission::X,
             ),
             None,
         );
@@ -221,6 +221,7 @@ impl MemorySet {
         // map trampoline
         memory_set.map_trampoline();
         // copy data sections/trap_context/user_stack
+        warn!("from token:{:x}", user_space.token());
         for area in user_space.areas.iter() {
             let new_area = MapArea::from_another(area);
             memory_set.push(new_area, None);
@@ -231,6 +232,7 @@ impl MemorySet {
                 dst_ppn
                     .get_bytes_array()
                     .copy_from_slice(src_ppn.get_bytes_array());
+                info!("src:{:?} dst:{:?} vpn:{:?}", src_ppn, dst_ppn, vpn);
             }
         }
         memory_set

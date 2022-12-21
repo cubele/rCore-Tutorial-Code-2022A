@@ -4,7 +4,6 @@ use alloc::vec::Vec;
 use lazy_static::lazy_static;
 use crate::probe::arch::trapframe::TrapFrame;
 
-
 use lock::Mutex;
 
 use crate::{probe::{register_kprobe, register_kretprobe, KProbeArgs, KRetProbeArgs}};
@@ -50,7 +49,7 @@ fn run_attached_programs(tracepoint: &Tracepoint, ctx: *const u8) {
     let programs = map.get(tracepoint).unwrap();
     for program in programs {
         let _result = program.run(ctx);
-        // error!("run result: {}", result);
+        // error!("run resultadr: {}", result);
     }
 }
 
@@ -79,9 +78,6 @@ fn kprobe_handler(tf: &mut TrapFrame, probed_addr: usize) -> isize {
     let tracepoint = Tracepoint::new(KProbe, probed_addr);
     let ctx = KProbeBPFContext::new(tf, probed_addr, 0);
     warn!("run attached progs!");
-    let obj = BPF_OBJECTS.lock();
-    let fd = 1879048193 as u32;
-    drop(obj);
     run_attached_programs(&tracepoint, ctx.as_ptr());
     warn!("run attached progs exit!");
 
@@ -106,7 +102,7 @@ fn resolve_symbol(symbol: &str) -> Option<usize> {
     //addr = 0x0000000080207b4a
     //panic!("resolve symbol need hardcoded symbol")
     //symbol_to_addr(symbol)
-    Some(0x0000000080207b4a)
+    Some(crate::syscall::fs::sys_open as usize)
 }
 
 fn parse_tracepoint<'a>(target: &'a str) -> Result<(TracepointType, &'a str), BpfErrorCode> {

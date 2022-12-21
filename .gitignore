@@ -10,3 +10,5 @@ target/
 ci-user/
 conf/
 ucore/
+
+os8/os.dump
