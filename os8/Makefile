@@ -28,6 +28,7 @@ build: env $(KERNEL_BIN) fs-img
 fs-img: $(APPS)
 	@make -C ../user build TEST=$(TEST) CHAPTER=$(CHAPTER) BASE=$(BASE)
 	@cd ../easy-fs-fuse && cargo run --release -- -s ../user/build/app/ -t ../user/target/riscv64gc-unknown-none-elf/release/
+	riscv64-unknown-elf-nm -C ./target/riscv64gc-unknown-none-elf/release/os > os.dump
 
 env:
 	(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
