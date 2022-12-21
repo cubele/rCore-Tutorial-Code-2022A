@@ -5,6 +5,7 @@ use alloc::sync::Arc;
 use super::consts::*;
 use super::retcode::{BpfResult, BpfErrorCode::*};
 use super::*;
+use super::osutil::{os_copy_from_user, os_copy_to_user, get_generic_from_user};
 use self::internal::{InternalMapAttr, BpfMap};
 use self::array::ArrayMap;
 use self::hash::HashMap;
@@ -55,6 +56,7 @@ pub fn bpf_map_create(attr: MapAttr) -> BpfResult {
             let shared_map = Arc::new(Mutex::new(map));
             let fd = bpf_allocate_fd();
             bpf_object_create_map(fd, shared_map);
+            warn!("create array, fd:{:x}", fd);
             Ok(fd as usize)
         }
         BPF_MAP_TYPE_HASH => {
@@ -62,6 +64,7 @@ pub fn bpf_map_create(attr: MapAttr) -> BpfResult {
             let shared_map = Arc::new(Mutex::new(map));
             let fd = bpf_allocate_fd();
             bpf_object_create_map(fd, shared_map);
+            warn!("create hash, fd:{:x}", fd);
             Ok(fd as usize)
         }
         _ => Err(EINVAL),
@@ -87,11 +90,35 @@ pub fn bpf_map_ops(fd: u32, op: BpfMapOp, key: *const u8, value: *mut u8, flags:
     let obj = bpf_objs.get(&fd).ok_or(ENOENT)?;
     let shared_map = obj.is_map().ok_or(ENOENT)?;
     let mut map = shared_map.lock();
+    let key_size = map.get_attr().key_size;
+    let value_size = map.get_attr().value_size;
+
+    let mut key_kern_buf = alloc::vec![0 as u8; key_size];
+    let kptr = key_kern_buf.as_mut_ptr();
+    os_copy_from_user(key as usize, kptr, key_size);
+
+
+    let mut value_kern_buf = alloc::vec![0 as u8; value_size];
+    let vptr = value_kern_buf.as_mut_ptr();
+
+    trace!("bpf map op got shared map");
     match op {
-        BpfMapOp::LookUp => map.lookup(key, value),
-        BpfMapOp::Update => map.update(key, value, flags),
-        BpfMapOp::Delete => map.delete(key),
-        BpfMapOp::GetNextKey => map.next_key(key, value),
+        BpfMapOp::LookUp => {
+            let ret = map.lookup(kptr, vptr);
+            os_copy_to_user(value as usize, vptr, value_size);
+            ret
+        },
+        BpfMapOp::Update => {
+            os_copy_from_user(value as usize, vptr, value_size);
+            let ret = map.update(kptr, vptr, flags);
+            ret
+        },
+        BpfMapOp::Delete => map.delete(kptr),
+        BpfMapOp::GetNextKey => {
+            let ret = map.next_key(kptr, vptr);
+            os_copy_to_user(value as usize, vptr, value_size);
+            ret
+        }
         _ => Err(EINVAL),
     }
 }

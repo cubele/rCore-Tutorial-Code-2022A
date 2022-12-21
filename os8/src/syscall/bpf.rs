@@ -56,7 +56,7 @@ pub fn sys_bpf(cmd: isize, bpf_attr: usize , size: usize) -> isize {
         if ret < 0 {
             -1
         } else {
-           0
+           ret as isize
         }
     } else {
         -1

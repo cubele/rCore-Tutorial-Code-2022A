@@ -11,7 +11,7 @@ use super::{
     tracepoints::*,
 };
 
-use core::{mem::size_of, fmt::Write};
+use core::{mem::size_of, fmt::Write, iter::Map};
 use super::program::bpf_program_load_ex;
 
 use alloc::sync::Arc;
@@ -66,10 +66,28 @@ pub fn os_copy_from_user(usr_addr: usize, kern_buf: *mut u8, len: usize) -> i32 
     use crate::mm::translated_byte_buffer;
     use crate::task::current_user_token;
     let t = translated_byte_buffer(current_user_token(), usr_addr as *const u8, len);
-    copy(kern_buf, t.as_ptr() as *const u8, len);
+    copy(kern_buf, t[0].as_ptr() as *const u8, len);
+    let res: &[u8] = unsafe {core::slice::from_raw_parts(kern_buf, len as usize)};
     0
 }
  
+pub fn os_copy_to_user(usr_addr: usize, kern_buf: *const u8, len: usize) -> i32 {
+    use crate::mm::translated_byte_buffer;
+    use crate::task::current_user_token;
+    let dst = translated_byte_buffer(current_user_token(), usr_addr as *const u8, len);
+    let mut ptr = kern_buf;
+    let mut total_len = len as i32;
+    for seg in dst {
+        let cur_len = seg.len();
+        total_len -= cur_len as i32;
+        unsafe {
+            core::ptr::copy_nonoverlapping(ptr, seg.as_mut_ptr(), cur_len);
+            ptr = ptr.add(cur_len);   
+        }
+    }
+    assert_eq!(total_len, 0);
+    0
+}
 
 pub fn copy(dst: *mut u8, src: *const u8, len: usize) {
     let from = unsafe { from_raw_parts(src, len) };
@@ -83,7 +101,27 @@ pub fn memcmp(u: *const u8, v: *const u8, len: usize) -> bool {
     }
 }
 
+// dst is a vector of slice of u8, i.e. serveral non-overlapping continious memory
+// src is a reference to a object<T> in kernel space, i.e. address is continious
+// this scatter the memory of src to dst
+pub unsafe fn scatter<T>(src: &T, dst: alloc::vec::Vec<&mut[u8]>) {
+    
+}
+
+
+pub fn get_generic_from_user<T: Copy>(user_addr: usize) -> T {
+    let size = size_of::<T>();
+    let ret = vec![0 as u8; size];
+    let buf = ret.as_ptr() as *const T;
+    os_copy_from_user(user_addr as usize, buf as *mut u8, size_of::<T>());
+    let attr = unsafe {
+        *(buf as *const T)
+    };
+    attr
+}
+
 fn convert_result(result: BpfResult) -> i32 {
+    warn!("result :{:?}", result);
     match result {
         Ok(val) => val as i32,
         Err(_) => -1,
@@ -93,48 +131,37 @@ fn convert_result(result: BpfResult) -> i32 {
 pub fn sys_bpf_map_create(attr: *const u8, size: usize) -> i32 {
    // assert_eq!(size as usize, size_of::<MapAttr>());
     info!("sys_bpf_map_create");
-    let map_attr = unsafe {
-        *(attr as *const MapAttr)
-    };
+    let map_attr: MapAttr = get_generic_from_user(attr as usize);
+    warn!("map create key:{}, value:{}", map_attr.key_size, map_attr.value_size);
     convert_result(bpf_map_create(map_attr))
 }
 
 pub fn sys_bpf_map_lookup_elem(attr: *const u8, size: usize) -> i32 {
    // assert_eq!(size as usize, size_of::<MapOpAttr>());
-    let map_op_attr = unsafe {
-        *(attr as *const MapOpAttr)
-    };
+    let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
     convert_result(bpf_map_lookup_elem(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags))
 }
 
 pub fn sys_bpf_map_update_elem(attr: *const u8, size: usize) -> i32 {
     //assert_eq!(size as usize, size_of::<MapOpAttr>());
-    let map_op_attr = unsafe {
-        *(attr as *const MapOpAttr)
-    };
+    let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
     convert_result(bpf_map_update_elem(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags))
 }
 
 pub fn sys_bpf_map_delete_elem(attr: *const u8, size: usize) -> i32 {
     //assert_eq!(size as usize, size_of::<MapOpAttr>());
-    let map_op_attr = unsafe {
-        *(attr as *const MapOpAttr)
-    };
+    let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
     convert_result(bpf_map_delete_elem(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags))
 }
 
 pub fn sys_bpf_map_get_next_key(attr: *const u8, size: usize) -> i32 {
-    let map_op_attr = unsafe {
-        *(attr as *const MapOpAttr)
-    };
+    let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
     convert_result(bpf_map_get_next_key(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags))
 }
 
 pub fn sys_bpf_program_attach(attr: *const u8, size: usize) -> i32 {
   //  assert_eq!(size, size_of::<KprobeAttachAttr>());
-    let attach_attr = unsafe {
-        *(attr as *const KprobeAttachAttr)
-    };
+    let attach_attr: KprobeAttachAttr = get_generic_from_user(attr as usize);
     let target_name = unsafe {
         core::str::from_utf8(
             core::slice::from_raw_parts(attach_attr.target, attach_attr.str_len as usize)
