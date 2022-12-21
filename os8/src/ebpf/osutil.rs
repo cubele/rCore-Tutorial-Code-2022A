@@ -65,9 +65,8 @@ pub fn os_console_write_str(s: &str) {
 pub fn os_copy_from_user(usr_addr: usize, kern_buf: *mut u8, len: usize) -> i32 {
     use crate::mm::translated_byte_buffer;
     use crate::task::current_user_token;
-    let t = translated_byte_buffer(current_user_token(), usr_addr as *const u8, len);
+    let t = translated_byte_buffer(current_user_token(), usr_addr as *const u8, len);    
     copy(kern_buf, t[0].as_ptr() as *const u8, len);
-    let res: &[u8] = unsafe {core::slice::from_raw_parts(kern_buf, len as usize)};
     0
 }
  
@@ -208,6 +207,7 @@ pub fn sys_preprocess_bpf_program_load_ex(attr_ptr: *const u8, size: usize) -> i
         unsafe {
             let entry = &(*start.add(i));
             let name_ptr = entry.name;
+            info!("name ptr {:x}", name_ptr as usize);
             let map_name = read_null_terminated_str(name_ptr);
             info!("insert map: {} fd: {}", map_name, entry.fd);
             map_info.push((map_name, entry.fd));            
@@ -220,11 +220,11 @@ pub fn sys_preprocess_bpf_program_load_ex(attr_ptr: *const u8, size: usize) -> i
 unsafe fn read_null_terminated_str(mut ptr: *const u8) -> String {
     let mut ret = String::new();
     loop {
-        let c: char = get_generic_from_user(ptr as usize);
-        if c == '\n' || c == '\0' {
+        let c: u8 = get_generic_from_user(ptr as usize);
+        if c == 0 {
             break;
         }
-        ret.push(c);
+        ret.push(c as char);
         ptr = ptr.add(1);
     }
     ret
