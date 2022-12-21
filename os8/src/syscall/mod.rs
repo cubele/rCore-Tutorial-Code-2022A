@@ -45,17 +45,20 @@ const SYSCALL_SEMAPHORE_DOWN: usize = 470;
 const SYSCALL_CONDVAR_CREATE: usize = 471;
 const SYSCALL_CONDVAR_SIGNAL: usize = 472;
 const SYSCALL_CONDVAR_WAIT: usize = 473;
+const SYSCALL_BPF: usize = 280;
 
 mod fs;
 pub mod process;
 mod sync;
 mod thread;
+mod bpf;
 
 use crate::fs::Stat;
 use fs::*;
 use process::*;
 use sync::*;
 use thread::*;
+use bpf::sys_bpf;
 
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
@@ -95,6 +98,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
         SYSCALL_CONDVAR_CREATE => sys_condvar_create(args[0]),
         SYSCALL_CONDVAR_SIGNAL => sys_condvar_signal(args[0]),
         SYSCALL_CONDVAR_WAIT => sys_condvar_wait(args[0], args[1]),
+        SYSCALL_BPF => sys_bpf(args[0] as isize, args[1] as usize, args[2] as usize),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

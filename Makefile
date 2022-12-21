@@ -2,7 +2,7 @@ include .env
 export
 
 HOST_DIR ?= $(shell pwd)
-TEST_REPO ?= https://github.com/LearningOS/rust-os-camp-2022-test.git
+TEST_REPO ?=https://github.com/livingshade/rCore-Tutorial-Test-2022A
 CONF_REPO ?= https://github.com/LearningOS/rust-os-camp-2022-conf.git
 TARGET ?= riscv64gc-unknown-none-elf
 

@@ -40,7 +40,7 @@ $(KERNEL_BIN): kernel
 
 kernel:
 	@make -C ../user build TEST=$(TEST) CHAPTER=$(CHAPTER) BASE=$(BASE)
-	@cargo build --release
+	@LOG=TRACE cargo build --release
 
 clean:
 	@cargo clean

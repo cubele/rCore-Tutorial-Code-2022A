@@ -3,7 +3,7 @@
     .section .data
     .global _num_app
 _num_app:
-    .quad 44
+    .quad 53
     .quad app_0_start
     .quad app_1_start
     .quad app_2_start
@@ -48,7 +48,16 @@ _num_app:
     .quad app_41_start
     .quad app_42_start
     .quad app_43_start
-    .quad app_43_end
+    .quad app_44_start
+    .quad app_45_start
+    .quad app_46_start
+    .quad app_47_start
+    .quad app_48_start
+    .quad app_49_start
+    .quad app_50_start
+    .quad app_51_start
+    .quad app_52_start
+    .quad app_52_end
 
     .global _app_names
 _app_names:
@@ -96,6 +105,15 @@ _app_names:
     .string "ch8b_threads"
     .string "ch8b_threads_arg"
     .string "ch8b_user_shell"
+    .string "ebpf_kern_context"
+    .string "ebpf_kern_map"
+    .string "ebpf_kern_time1"
+    .string "ebpf_user_kernmaptest"
+    .string "ebpf_user_loadprogextest"
+    .string "ebpf_user_maptest"
+    .string "ebpf_user_naivetest"
+    .string "hello_world"
+    .string "naivetest"
 
     .section .data
     .global app_0_start
@@ -448,3 +466,75 @@ app_42_end:
 app_43_start:
     .incbin "../user/build/elf/ch8b_user_shell.elf"
 app_43_end:
+
+    .section .data
+    .global app_44_start
+    .global app_44_end
+    .align 3
+app_44_start:
+    .incbin "../user/build/elf/ebpf_kern_context.elf"
+app_44_end:
+
+    .section .data
+    .global app_45_start
+    .global app_45_end
+    .align 3
+app_45_start:
+    .incbin "../user/build/elf/ebpf_kern_map.elf"
+app_45_end:
+
+    .section .data
+    .global app_46_start
+    .global app_46_end
+    .align 3
+app_46_start:
+    .incbin "../user/build/elf/ebpf_kern_time1.elf"
+app_46_end:
+
+    .section .data
+    .global app_47_start
+    .global app_47_end
+    .align 3
+app_47_start:
+    .incbin "../user/build/elf/ebpf_user_kernmaptest.elf"
+app_47_end:
+
+    .section .data
+    .global app_48_start
+    .global app_48_end
+    .align 3
+app_48_start:
+    .incbin "../user/build/elf/ebpf_user_loadprogextest.elf"
+app_48_end:
+
+    .section .data
+    .global app_49_start
+    .global app_49_end
+    .align 3
+app_49_start:
+    .incbin "../user/build/elf/ebpf_user_maptest.elf"
+app_49_end:
+
+    .section .data
+    .global app_50_start
+    .global app_50_end
+    .align 3
+app_50_start:
+    .incbin "../user/build/elf/ebpf_user_naivetest.elf"
+app_50_end:
+
+    .section .data
+    .global app_51_start
+    .global app_51_end
+    .align 3
+app_51_start:
+    .incbin "../user/build/elf/hello_world.elf"
+app_51_end:
+
+    .section .data
+    .global app_52_start
+    .global app_52_end
+    .align 3
+app_52_start:
+    .incbin "../user/build/elf/naivetest.elf"
+app_52_end:
