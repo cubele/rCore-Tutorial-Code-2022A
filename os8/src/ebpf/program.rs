@@ -1,3 +1,4 @@
+
 use alloc::string::String;
 use alloc::vec::Vec;
 use xmas_elf;
@@ -49,7 +50,6 @@ impl BpfProgram {
             };
             return result;
         }
-
         todo!("eBPF interpreter missing")
     }
 }
@@ -67,17 +67,15 @@ pub fn bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> BpfRe
     // build map fd table. storage must be fixed after this.
 
     let mut map_fd_table = Vec::with_capacity(200);
-    info!("addr {:x}, len {}", map_fd_table.as_ptr() as usize, map_info.len());
     for map_fd in map_info {
         map_fd_table.push(map_fd.1);
-        trace!("pushed fd: {}", map_fd.1);
+        trace!("bpf map pushed fd: {}", map_fd.1);
     }
-
-    info!("map fd table built len: {}", map_fd_table.len());
 
     // build index -> map_fd variable address mapping
     let mut map_symbols = BTreeMap::new();
     let sym_tab_hdr = elf.find_section_by_name(".symtab").ok_or(ENOENT)?;
+    trace!("symbol table");
     if let Ok(SectionData::SymbolTable64(sym_entries)) = sym_tab_hdr.get_data(&elf) {
         for (sym_idx, sym) in sym_entries.iter().enumerate() {
             if let Ok(name) = sym.get_name(&elf) {
@@ -94,10 +92,10 @@ pub fn bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> BpfRe
     }
     if map_symbols.len() != map_info.len() {
         // unable to resolve all map info
+        error!("map config error, expected map info len: {}, found: {}", map_symbols.len(), map_info.len());
         return Err(ENOENT);
     }
 
-    trace!("map resolution finished");
     // relocate maps
     for sec_hdr in elf.section_iter() {
         if let Ok(ShType::Rel) = sec_hdr.get_type() {
@@ -118,12 +116,11 @@ pub fn bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> BpfRe
                     } else {
                         continue;
                     }
-                    info!("relocate entry idx: {} offset:{:x} type:{:?} to addr:{:x}", sym_idx, offset, rel_type, relocated_addr);
+                    trace!("bpf prog relocate entry idx: {} offset:{:x} type:{:?} to addr:{:x}", sym_idx, offset, rel_type, relocated_addr);
 
                     match rel_type {
                         // relocation for LD_IMM64 instruction
                         R_BPF_64_64 => {
-                            trace!("rel type match load 64!");
                             let addr = relocated_addr as u64;
                             let (v1, v2) = (addr as u32, (addr >> 32) as u32);
                             let p1 = (base + offset + 4) as *mut u32;
@@ -134,7 +131,6 @@ pub fn bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> BpfRe
                             }
                         },
                         R_BPF_64_32 => {
-                            trace!("rel type match call");
                             let addr = relocated_addr as u64;
                             let v = addr / 8 - 1;
                             let (v1, v2) = (v as u32, (v >> 32) as u32);
@@ -153,6 +149,7 @@ pub fn bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> BpfRe
     }
 
     // compile eBPF code
+    info!("before compile");
     let sec_hdr = elf.find_section_by_name(".text").ok_or(ENOENT)?;
     let code = sec_hdr.raw_data(&elf);
     let bpf_insns = unsafe {
@@ -166,8 +163,6 @@ pub fn bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> BpfRe
         unsafe { core::mem::transmute::<&[BpfHelperFn], &[u64]>(&HELPER_FN_TABLE) };
     compile::compile(&mut jit_ctx, helper_fn_table, 512);
 
-    info!("map fd table addr {:x}", map_fd_table.as_ptr() as usize);
-
     let compiled_code = jit_ctx.code; // partial move
 
     let program = BpfProgram {
@@ -178,6 +173,7 @@ pub fn bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> BpfRe
 
     let fd = bpf_allocate_fd();
     bpf_object_create_program(fd, program);
+    trace!("bpf prog loadex finished!");
     Ok(fd as usize)
 }
 

@@ -66,7 +66,11 @@ pub fn os_copy_from_user(usr_addr: usize, kern_buf: *mut u8, len: usize) -> i32 
     use crate::mm::translated_byte_buffer;
     use crate::task::current_user_token;
     let t = translated_byte_buffer(current_user_token(), usr_addr as *const u8, len);    
-    copy(kern_buf, t[0].as_ptr() as *const u8, len);
+    let mut all = vec![];
+    for i in t {
+        all.extend(i.to_vec());
+    }
+    copy(kern_buf, all.as_ptr() as *const u8, len);
     0
 }
  
@@ -120,42 +124,46 @@ pub fn get_generic_from_user<T: Copy>(user_addr: usize) -> T {
 }
 
 fn convert_result(result: BpfResult) -> i32 {
-    warn!("result :{:?}", result);
     match result {
         Ok(val) => val as i32,
-        Err(_) => -1,
+        Err(err) => {
+            warn!("convert result get error! {:?}", err);
+            -1
+        }
     }
 }
 
 pub fn sys_bpf_map_create(attr: *const u8, size: usize) -> i32 {
    // assert_eq!(size as usize, size_of::<MapAttr>());
-    info!("sys_bpf_map_create");
     let map_attr: MapAttr = get_generic_from_user(attr as usize);
-    warn!("map create key:{}, value:{}", map_attr.key_size, map_attr.value_size);
     convert_result(bpf_map_create(map_attr))
 }
 
 pub fn sys_bpf_map_lookup_elem(attr: *const u8, size: usize) -> i32 {
    // assert_eq!(size as usize, size_of::<MapOpAttr>());
     let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
-    convert_result(bpf_map_lookup_elem(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags))
+    let ret = bpf_map_lookup_elem(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags, true);
+    convert_result(ret)
 }
 
 pub fn sys_bpf_map_update_elem(attr: *const u8, size: usize) -> i32 {
     //assert_eq!(size as usize, size_of::<MapOpAttr>());
     let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
-    convert_result(bpf_map_update_elem(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags))
+    let ret = bpf_map_update_elem(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags, true);
+    convert_result(ret)
 }
 
 pub fn sys_bpf_map_delete_elem(attr: *const u8, size: usize) -> i32 {
     //assert_eq!(size as usize, size_of::<MapOpAttr>());
     let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
-    convert_result(bpf_map_delete_elem(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags))
+    let ret = bpf_map_delete_elem(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags, true);
+    convert_result(ret)
 }
 
 pub fn sys_bpf_map_get_next_key(attr: *const u8, size: usize) -> i32 {
     let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
-    convert_result(bpf_map_get_next_key(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags))
+    let ret = bpf_map_get_next_key(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags, true);
+    convert_result(ret)
 }
 
 pub fn sys_bpf_program_attach(attr: *const u8, size: usize) -> i32 {
@@ -174,6 +182,11 @@ pub fn sys_bpf_program_attach(attr: *const u8, size: usize) -> i32 {
     convert_result(bpf_program_attach(target_name, attach_attr.prog_fd))
 }
 
+pub fn sys_bpf_program_detach(attr: *const u8, size: usize) -> i32 {
+    let detach_attr: KprobeAttachAttr = get_generic_from_user(attr as usize);
+    trace!("detach fd {}", detach_attr.prog_fd);
+    convert_result(bpf_program_detach(detach_attr.prog_fd))
+}
 
 // this is a custome function, so we just copy from rCore
 pub fn sys_bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> i32 {
@@ -184,16 +197,14 @@ pub fn sys_bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> i
 
 #[allow(unused_mut)]
 pub fn sys_preprocess_bpf_program_load_ex(attr_ptr: *const u8, size: usize) -> i32 {
-    trace!("load program ex");
 
     let attr:ProgramLoadExAttr = get_generic_from_user(attr_ptr as usize);
 
-    info!("prog attr\n prog_base:{:x} prog_size={} map_base:{:x} map_num={}", attr.elf_prog, attr.elf_size, attr.map_array as usize, attr.map_array_len);
+   trace!("prog load attr\n prog_base:{:x} prog_size={} map_base:{:x} map_num={}", attr.elf_prog, attr.elf_size, attr.map_array as usize, attr.map_array_len);
     let base = attr.elf_prog as usize;
     let size = attr.elf_size as usize;
     let mut prog = vec![0 as u8; size];
     os_copy_from_user(base, prog.as_mut_ptr(), size);
-
     let arr_len = attr.map_array_len as usize;
     let arr_size = arr_len * core::mem::size_of::<MapFdEntry>();
     let mut map_fd_array = vec![0 as u8; arr_size];
@@ -207,9 +218,8 @@ pub fn sys_preprocess_bpf_program_load_ex(attr_ptr: *const u8, size: usize) -> i
         unsafe {
             let entry = &(*start.add(i));
             let name_ptr = entry.name;
-            info!("name ptr {:x}", name_ptr as usize);
             let map_name = read_null_terminated_str(name_ptr);
-            info!("insert map: {} fd: {}", map_name, entry.fd);
+            trace!("insert map: {} fd: {}", map_name, entry.fd);
             map_info.push((map_name, entry.fd));            
         }   
     }

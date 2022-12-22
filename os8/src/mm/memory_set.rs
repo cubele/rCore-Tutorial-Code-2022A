@@ -221,7 +221,6 @@ impl MemorySet {
         // map trampoline
         memory_set.map_trampoline();
         // copy data sections/trap_context/user_stack
-        warn!("from token:{:x}", user_space.token());
         for area in user_space.areas.iter() {
             let new_area = MapArea::from_another(area);
             memory_set.push(new_area, None);

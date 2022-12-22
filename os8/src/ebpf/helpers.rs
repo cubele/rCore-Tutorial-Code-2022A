@@ -32,19 +32,19 @@ pub static HELPER_FN_TABLE: [BpfHelperFn; HELPER_FN_COUNT] = [
 // in syscall contexts. obtaining current process information may cause deadlock!
 
 fn bpf_helper_map_lookup_elem(fd: u64, key: u64, value: u64, _4: u64, _5: u64) -> i64 {
-    match bpf_map_lookup_elem(fd as u32, key as *const u8, value as *mut u8, 0) {
+    match bpf_map_lookup_elem(fd as u32, key as *const u8, value as *mut u8, 0, false) {
         Ok(val) => val as i64,
         Err(_) => -1
     }
 }
 fn bpf_helper_map_update_elem(fd: u64, key: u64, value: u64, flags: u64, _5: u64) -> i64 {
-    match bpf_map_update_elem(fd as u32, key as *const u8, value as *mut u8, flags) {
+    match bpf_map_update_elem(fd as u32, key as *const u8, value as *mut u8, flags, false) {
         Ok(val) => val as i64,
         Err(_) => -1
     }
 }
 fn bpf_helper_map_delete_elem(fd: u64, key: u64, _3: u64, _4: u64, _5: u64) -> i64 {
-    match bpf_map_delete_elem(fd as u32, key as *const u8, 0 as *mut u8, 0) {
+    match bpf_map_delete_elem(fd as u32, key as *const u8, 0 as *mut u8, 0, false) {
         Ok(val) => val as i64,
         Err(_) => -1
     }

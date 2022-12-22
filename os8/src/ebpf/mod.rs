@@ -52,7 +52,7 @@ pub fn bpf_allocate_fd() -> u32 {
 }
 
 pub fn bpf_object_create(fd: u32, obj: BpfObject) {
-    error!("inserted key(fd):{}", fd);
+    trace!("bpf object create (fd):{:x}", fd);
     BPF_OBJECTS.lock().insert(fd, obj);
 }
 

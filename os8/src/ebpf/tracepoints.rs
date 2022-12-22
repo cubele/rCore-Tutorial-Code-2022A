@@ -2,7 +2,7 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
-use crate::probe::arch::trapframe::TrapFrame;
+use crate::probe::{arch::trapframe::TrapFrame, kprobes::unregister_kprobe};
 
 use lock::Mutex;
 
@@ -77,9 +77,9 @@ impl KProbeBPFContext {
 fn kprobe_handler(tf: &mut TrapFrame, probed_addr: usize) -> isize {
     let tracepoint = Tracepoint::new(KProbe, probed_addr);
     let ctx = KProbeBPFContext::new(tf, probed_addr, 0);
-    warn!("run attached progs!");
+    info!("run attached progs!");
     run_attached_programs(&tracepoint, ctx.as_ptr());
-    warn!("run attached progs exit!");
+    info!("run attached progs exit!");
 
     0
 }
@@ -126,26 +126,19 @@ fn parse_tracepoint<'a>(target: &'a str) -> Result<(TracepointType, &'a str), Bp
 
 pub fn bpf_program_attach(target: &str, prog_fd: u32) -> BpfResult {
     // check program fd
-
-    warn!("bpf prog attach target: {} \n fd:{}\n", target, prog_fd);
-
     let program = {
         let objs = BPF_OBJECTS.lock();
         
         match objs.get(&prog_fd) {
             Some(bpf_obj) => {
                 let shared_program = bpf_obj.is_program().unwrap();
-                trace!("found prog:!");
                 Ok(shared_program.clone())
             },
             _ => Err(ENOENT),
         }
     }?;
-    warn!("prog found!");
     let (tp_type, fn_name) = parse_tracepoint(target)?;
-    warn!("tracepoint parsed: type={:?} fn={}", tp_type, fn_name);
     let addr = resolve_symbol(fn_name).ok_or(ENOENT)?;
-    warn!("trace point symbol resolved, symbol:{} addr: {:x}", fn_name, addr);
 
     let tracepoint = Tracepoint::new(tp_type, addr);
 
@@ -166,7 +159,6 @@ pub fn bpf_program_attach(target: &str, prog_fd: u32) -> BpfResult {
                     user_data: addr,
                 };
                 let _ = register_kprobe(addr, args).ok_or(EINVAL)?;
-                warn!("kprobe registered at addr: {:x}", addr);
                 map.insert(tracepoint, vec![program]);
             }
             KRetProbeEntry | KRetProbeExit => {
@@ -189,6 +181,34 @@ pub fn bpf_program_attach(target: &str, prog_fd: u32) -> BpfResult {
             }
         }
     }
-    warn!("OK");
+    trace!("bpf prog attached! tracepoint symbol:{} addr: {:x}", fn_name, addr);
     Ok(0)
+}
+
+pub fn bpf_program_detach(prog_fd: u32) -> BpfResult {
+    if let Some(prog) = bpf_object_remove(prog_fd) {
+        let prog = prog.is_program().unwrap();
+        let mut map = ATTACHED_PROGS.lock();
+        let mut t = Tracepoint::new(TracepointType::KProbe, 0);
+        let mut id = 0;
+        for (k, v) in map.iter() {
+            let mut find = false;
+            for (i, p) in v.iter().enumerate() {
+                if Arc::ptr_eq(p, &prog) {
+                    t = k.clone();
+                    id = i;
+                    find = true;
+                }
+            }
+            if find {
+                break;
+            }
+        }
+        let v = map.get_mut(&t).unwrap();
+        v.remove(id);
+        //unregister_kprobe(t.token);
+        Ok(0)
+    } else {
+        Err(ENOENT)
+    }
 }

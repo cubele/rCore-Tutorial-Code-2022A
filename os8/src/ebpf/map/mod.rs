@@ -5,6 +5,7 @@ use alloc::sync::Arc;
 use super::consts::*;
 use super::retcode::{BpfResult, BpfErrorCode::*};
 use super::*;
+use super::osutil::{os_copy_from_user, os_copy_to_user};
 use self::internal::{InternalMapAttr, BpfMap};
 use self::array::ArrayMap;
 use self::hash::HashMap;
@@ -81,35 +82,65 @@ pub fn bpf_map_get_attr(fd: u32) -> Option<InternalMapAttr> {
 }
 
 #[allow(unreachable_patterns)]
-pub fn bpf_map_ops(fd: u32, op: BpfMapOp, key: *const u8, value: *mut u8, flags: u64) -> BpfResult {
+pub fn bpf_map_ops(fd: u32, op: BpfMapOp, key: *const u8, value: *mut u8, flags: u64, from_user: bool) -> BpfResult {
     trace!("bpf map ops fd:{}, op:{:?} key:{:x} value:{:x}", fd, op, key as usize, value as usize);
     let bpf_objs = BPF_OBJECTS.lock();
     let obj = bpf_objs.get(&fd).ok_or(ENOENT)?;
     let shared_map = obj.is_map().ok_or(ENOENT)?;
     let mut map = shared_map.lock();
-    match op {
-        BpfMapOp::LookUp => map.lookup(key, value),
-        BpfMapOp::Update => map.update(key, value, flags),
-        BpfMapOp::Delete => map.delete(key),
-        BpfMapOp::GetNextKey => map.next_key(key, value),
-        _ => Err(EINVAL),
+    if from_user {
+        let key_size = map.get_attr().key_size;
+        let value_size = map.get_attr().value_size;
+        let mut key_kern_buf = alloc::vec![0 as u8; key_size];
+        let kptr = key_kern_buf.as_mut_ptr();
+        os_copy_from_user(key as usize, kptr, key_size);
+        let mut value_kern_buf = alloc::vec![0 as u8; value_size];
+        let vptr = value_kern_buf.as_mut_ptr();
+        match op {
+            BpfMapOp::LookUp => {
+                let ret = map.lookup(kptr, vptr);
+                os_copy_to_user(value as usize, vptr, value_size);
+                ret
+            },
+            BpfMapOp::Update => {
+                os_copy_from_user(value as usize, vptr, value_size);
+                let ret = map.update(kptr, vptr, flags);
+                ret
+            },
+            BpfMapOp::Delete => map.delete(kptr),
+            BpfMapOp::GetNextKey => {
+                let ret = map.next_key(kptr, vptr);
+                os_copy_to_user(value as usize, vptr, value_size);
+                ret
+            }
+            _ => Err(EINVAL),
+        }
+    } else {
+        match op {
+            BpfMapOp::LookUp => map.lookup(key, value),
+            BpfMapOp::Update => map.update(key, value, flags),
+            BpfMapOp::Delete => map.delete(key),
+            BpfMapOp::GetNextKey => map.next_key(key, value),
+            _ => Err(EINVAL),
+        }
     }
+    
 }
 
-pub fn bpf_map_lookup_elem(fd: u32, key: *const u8, value: *mut u8, flags: u64) -> BpfResult {
-    bpf_map_ops(fd, BpfMapOp::LookUp, key, value, flags)   
+pub fn bpf_map_lookup_elem(fd: u32, key: *const u8, value: *mut u8, flags: u64, from_user: bool) -> BpfResult {
+    bpf_map_ops(fd, BpfMapOp::LookUp, key, value, flags, from_user)   
 }
 
-pub fn bpf_map_update_elem(fd: u32, key: *const u8, value: *mut u8, flags: u64) -> BpfResult {
-    bpf_map_ops(fd, BpfMapOp::Update, key, value, flags)   
+pub fn bpf_map_update_elem(fd: u32, key: *const u8, value: *mut u8, flags: u64, from_user: bool) -> BpfResult {
+    bpf_map_ops(fd, BpfMapOp::Update, key, value, flags, from_user)   
 }
 
-pub fn bpf_map_delete_elem(fd: u32, key: *const u8, value: *mut u8, flags: u64) -> BpfResult {
-    bpf_map_ops(fd, BpfMapOp::Delete, key, value, flags)   
+pub fn bpf_map_delete_elem(fd: u32, key: *const u8, value: *mut u8, flags: u64, from_user: bool) -> BpfResult {
+    bpf_map_ops(fd, BpfMapOp::Delete, key, value, flags, from_user)   
 }
 
-pub fn bpf_map_get_next_key(fd: u32, key: *const u8, value: *mut u8, flags: u64) -> BpfResult {
-    bpf_map_ops(fd, BpfMapOp::GetNextKey, key, value, flags)   
+pub fn bpf_map_get_next_key(fd: u32, key: *const u8, value: *mut u8, flags: u64, from_user: bool) -> BpfResult {
+    bpf_map_ops(fd, BpfMapOp::GetNextKey, key, value, flags, from_user)   
 }
 
 // pub fn bpf_map_lookup_helper(fd: u32, key: *const u8) -> BpfResult {
