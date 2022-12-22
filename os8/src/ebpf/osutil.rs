@@ -104,14 +104,6 @@ pub fn memcmp(u: *const u8, v: *const u8, len: usize) -> bool {
     }
 }
 
-// dst is a vector of slice of u8, i.e. serveral non-overlapping continious memory
-// src is a reference to a object<T> in kernel space, i.e. address is continious
-// this scatter the memory of src to dst
-pub unsafe fn scatter<T>(src: &T, dst: alloc::vec::Vec<&mut[u8]>) {
-    
-}
-
-
 pub fn get_generic_from_user<T: Copy>(user_addr: usize) -> T {
     let size = size_of::<T>();
     let ret = vec![0 as u8; size];

@@ -8,32 +8,12 @@
 #![allow(unreachable_patterns)]
 
 use super::*;
-use alloc::string::String;
 
-use crate::ebpf::program::MapFdEntry;
 use crate::ebpf::{
     consts::BpfCommand,
-    program::ProgramLoadExAttr,
     osutil::*,
 };
 use core::convert::TryFrom;
-// use zircon_object::vm::{
-//     VmObject
-// };
-
-unsafe fn read_null_terminated_str(mut ptr: *const u8) -> String {
-    let mut ret = String::new();
-    loop {
-        let c = *ptr as char;
-        if c == '\n' || c == '\0' {
-            break;
-        }
-        ret.push(c);
-        ptr = ptr.add(1);
-    }
-    ret
-}
-
 
 pub fn sys_bpf(cmd: isize, bpf_attr: usize , size: usize) -> isize {
     info!("sys_bpf cmd: {}, bpf_attr: {}, size: {}", cmd, bpf_attr, size);
