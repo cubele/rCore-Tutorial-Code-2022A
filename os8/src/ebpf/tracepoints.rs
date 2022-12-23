@@ -1,6 +1,7 @@
 //! eBPF tracepoints
 //!
 //! attach a program to hookpoints
+//! 
 //! currently we only support Kprobe
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
@@ -15,8 +16,8 @@ use super::{BpfObject::*, *, retcode::BpfErrorCode::{*, self}, retcode::*};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-/// target is the kernel hookpoint symbol name
 pub struct KprobeAttachAttr {
+    /// kernel hookpoint symbol name
     pub target: *const u8,
     pub str_len: u32,
     pub prog_fd: u32,
@@ -31,10 +32,12 @@ pub enum TracepointType {
 
 use TracepointType::*;
 
-// Current design is very simple and this is only intended for kprobe/kretprobe
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+/// tracepoint abstraction, currently only for Kprobe
 pub struct Tracepoint {
     pub tp_type: TracepointType,
+    /// Kprobe attach address
     pub token: usize,
 }
 
@@ -49,6 +52,14 @@ lazy_static! {
         Mutex::new(BTreeMap::new());
 }
 
+/// # run attached programs
+/// run all programs that attached to that tracepoint
+/// # arguments
+/// * tracepoint - tracepoint that is triggered
+/// * ctx - the current context infomation
+/// # prodecure
+/// * get the bpf program object by tracepoint.token
+/// * run them one by one, order is preserved
 fn run_attached_programs(tracepoint: &Tracepoint, ctx: *const u8) {
     let map = ATTACHED_PROGS.lock();
     let programs = map.get(tracepoint).unwrap();
@@ -91,6 +102,7 @@ fn kprobe_handler(tf: &mut TrapFrame, probed_addr: usize) -> isize {
     0
 }
 
+/// unused
 fn kretprobe_entry_handler(tf: &mut TrapFrame, probed_addr: usize) -> isize {
     let tracepoint = Tracepoint::new(KRetProbeEntry, probed_addr);
     let ctx = KProbeBPFContext::new(tf, probed_addr, 1);
@@ -98,6 +110,7 @@ fn kretprobe_entry_handler(tf: &mut TrapFrame, probed_addr: usize) -> isize {
     0
 }
 
+/// unused
 fn kretprobe_exit_handler(tf: &mut TrapFrame, probed_addr: usize) -> isize {
     let tracepoint = Tracepoint::new(KRetProbeExit, probed_addr);
     let ctx = KProbeBPFContext::new(tf, probed_addr, 2);
@@ -114,6 +127,7 @@ fn resolve_symbol(symbol: &str) -> Option<usize> {
     Some(crate::syscall::fs::sys_open as usize)
 }
 
+/// parse tracepoint types
 fn parse_tracepoint<'a>(target: &'a str) -> Result<(TracepointType, &'a str), BpfErrorCode> {
     let pos = target.find('$').ok_or(EINVAL)?;
     let type_str = &target[0..pos];
@@ -133,7 +147,7 @@ fn parse_tracepoint<'a>(target: &'a str) -> Result<(TracepointType, &'a str), Bp
     Ok((tp_type, fn_name))
 }
 
-/// bpf_program_attach
+/// # bpf_program_attach
 /// attach a program to a hookpoint
 /// # arguments
 /// * target - a str the represent hookpoiint symbol
@@ -206,7 +220,7 @@ pub fn bpf_program_attach(target: &str, prog_fd: u32) -> BpfResult {
     Ok(0)
 }
 
-/// bpf_program_detach
+/// # bpf_program_detach
 /// detach a program from hookpoint
 /// # arguments
 /// * prog_fd - the fd of the bpf program

@@ -36,8 +36,8 @@ pub struct ProgramLoadExAttr {
     pub map_array: *const MapFdEntry,
 }
 
-/// actual defination of BpfProgram
-/// bpf_insns are unused
+/// actual defination of BpfProgram,
+/// bpf_insns is unused
 pub struct BpfProgram {
     bpf_insns: Option<Vec<u64>>,
     jited_prog: Option<Vec<u32>>, // TODO: should be something like Vec<u8>

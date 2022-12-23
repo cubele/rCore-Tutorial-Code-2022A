@@ -22,6 +22,7 @@ mod hash;
 pub type SharedBpfMap = Arc<Mutex<dyn BpfMap + Send + Sync>>;
 
 /// MapAttr, follows the linux convection
+/// 
 /// Used by BPF_MAP_CREATE
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -33,6 +34,7 @@ pub struct MapAttr {
 }
 
 /// MapOpAttr, follows the linux convection
+/// 
 /// Used by BPF_MAP_*_ELEM and BPF_MAP_GET_NEXT_KEY commands 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -51,7 +53,7 @@ pub enum BpfMapOp {
     GetNextKey,
 }
 
-/// bpf_map_create
+/// # bpf_map_create
 /// create a bpf map
 /// # arguments
 /// * attr - the map attributes, include key_size, value_size ...s
@@ -96,7 +98,7 @@ pub fn bpf_map_get_attr(fd: u32) -> Option<InternalMapAttr> {
     Some(attr)
 }
 
-/// bpf_map_ops
+/// # bpf_map_ops
 /// wrapper function for map operations
 /// # arguments
 /// * fd - the file descriptor of the map
@@ -108,7 +110,7 @@ pub fn bpf_map_get_attr(fd: u32) -> Option<InternalMapAttr> {
 /// # procedure
 /// * get the map objects by fd
 /// * does the map operation according to op
-/// * refer to https://livingshade.github.io/ebpf-doc/rcore/#bpf-map-operations for the details
+/// * refer to <https://livingshade.github.io/ebpf-doc/rcore/#bpf-map-operations> for the details
 #[allow(unreachable_patterns)]
 pub fn bpf_map_ops(fd: u32, op: BpfMapOp, key: *const u8, value: *mut u8, flags: u64, from_user: bool) -> BpfResult {
     trace!("bpf map ops fd:{}, op:{:?} key:{:x} value:{:x}", fd, op, key as usize, value as usize);

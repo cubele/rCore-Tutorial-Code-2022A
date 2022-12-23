@@ -1,6 +1,8 @@
 
 
-// ! OS dependent part
+//! OS depedent parts and some helpers 
+//! 
+//! one needs to change os_* to migrate to another kernel
 
 use super::{
     map::*,
@@ -21,6 +23,7 @@ use downcast_rs::{impl_downcast, DowncastSync};
 
 use crate::task::TaskControlBlock;
 
+/// ThreadLike is an analog for Linux thread
 pub trait ThreadLike : DowncastSync {
     fn get_pid(&self) -> u64;
     fn get_tid(&self) -> u64;
@@ -29,6 +32,7 @@ pub trait ThreadLike : DowncastSync {
 
 impl_downcast!(ThreadLike);
 
+/// in rCore, `TaskControlBlock` is the thread abstract
 impl ThreadLike for TaskControlBlock {
     fn get_pid(&self) -> u64 {
         let proc = self.process.upgrade().unwrap();
@@ -42,6 +46,7 @@ impl ThreadLike for TaskControlBlock {
     }
 }
 
+/// get current user thread
 pub fn os_current_thread() -> Arc<dyn ThreadLike> {
     if let Some(thread) = crate::task::current_task() {
         thread
@@ -50,18 +55,23 @@ pub fn os_current_thread() -> Arc<dyn ThreadLike> {
     }
 }
 
+/// get current time
 pub fn os_current_time() -> u128 {
    crate::timer::get_time_us() as u128 * 1000
 }
 
+/// get current hart
 pub fn os_get_current_cpu() -> u8 {
    0 // not viable
 }
 
+/// write a str to kernel log
 pub fn os_console_write_str(s: &str) {
     crate::console::Stdout.write_str(s).unwrap();
 }
 
+/// # os_copy_from_user
+/// copy `len` bytes from user space addresss `usr_addr` to `kern_buf`
 pub fn os_copy_from_user(usr_addr: usize, kern_buf: *mut u8, len: usize) -> i32 {
     use crate::mm::translated_byte_buffer;
     use crate::task::current_user_token;
@@ -74,6 +84,8 @@ pub fn os_copy_from_user(usr_addr: usize, kern_buf: *mut u8, len: usize) -> i32 
     0
 }
  
+/// # os_copy_to_user
+/// copy `len` bytes to user space addresss `usr_addr` from `kern_buf`
 pub fn os_copy_to_user(usr_addr: usize, kern_buf: *const u8, len: usize) -> i32 {
     use crate::mm::translated_byte_buffer;
     use crate::task::current_user_token;
@@ -92,18 +104,25 @@ pub fn os_copy_to_user(usr_addr: usize, kern_buf: *const u8, len: usize) -> i32 
     0
 }
 
+/// copy within kernel space
 pub fn copy(dst: *mut u8, src: *const u8, len: usize) {
     let from = unsafe { from_raw_parts(src, len) };
     let to = unsafe { from_raw_parts_mut(dst, len) };
     to.copy_from_slice(from);
 }
 
+/// compare two pointer `u` `v` for `len` bytes
+/// 
+/// return 0 on exact equal
 pub fn memcmp(u: *const u8, v: *const u8, len: usize) -> bool {
     return unsafe {
         from_raw_parts(u, len) == from_raw_parts(v, len)
     }
 }
 
+/// # get_generic_from_user
+/// from user space address `user_addr` copy a object with type `T`
+/// * T is an generic type that must implment Copy trait
 pub fn get_generic_from_user<T: Copy>(user_addr: usize) -> T {
     let size = size_of::<T>();
     let ret = vec![0 as u8; size];
@@ -115,6 +134,7 @@ pub fn get_generic_from_user<T: Copy>(user_addr: usize) -> T {
     attr
 }
 
+/// convert a `BpfResult` to `i32` for syscall interface
 fn convert_result(result: BpfResult) -> i32 {
     match result {
         Ok(val) => val as i32,
@@ -125,12 +145,14 @@ fn convert_result(result: BpfResult) -> i32 {
     }
 }
 
+/// wrapper
 pub fn sys_bpf_map_create(attr: *const u8, size: usize) -> i32 {
    // assert_eq!(size as usize, size_of::<MapAttr>());
     let map_attr: MapAttr = get_generic_from_user(attr as usize);
     convert_result(bpf_map_create(map_attr))
 }
 
+/// wrapper
 pub fn sys_bpf_map_lookup_elem(attr: *const u8, size: usize) -> i32 {
    // assert_eq!(size as usize, size_of::<MapOpAttr>());
     let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
@@ -138,6 +160,7 @@ pub fn sys_bpf_map_lookup_elem(attr: *const u8, size: usize) -> i32 {
     convert_result(ret)
 }
 
+/// wrapper
 pub fn sys_bpf_map_update_elem(attr: *const u8, size: usize) -> i32 {
     //assert_eq!(size as usize, size_of::<MapOpAttr>());
     let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
@@ -145,6 +168,7 @@ pub fn sys_bpf_map_update_elem(attr: *const u8, size: usize) -> i32 {
     convert_result(ret)
 }
 
+/// wrapper
 pub fn sys_bpf_map_delete_elem(attr: *const u8, size: usize) -> i32 {
     //assert_eq!(size as usize, size_of::<MapOpAttr>());
     let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
@@ -152,12 +176,14 @@ pub fn sys_bpf_map_delete_elem(attr: *const u8, size: usize) -> i32 {
     convert_result(ret)
 }
 
+/// wrapper
 pub fn sys_bpf_map_get_next_key(attr: *const u8, size: usize) -> i32 {
     let map_op_attr: MapOpAttr = get_generic_from_user(attr as usize);
     let ret = bpf_map_get_next_key(map_op_attr.map_fd, map_op_attr.key as *const u8, map_op_attr.value_or_nextkey as *mut u8, map_op_attr.flags, true);
     convert_result(ret)
 }
 
+/// wrapper
 pub fn sys_bpf_program_attach(attr: *const u8, size: usize) -> i32 {
   //  assert_eq!(size, size_of::<KprobeAttachAttr>());
     let attach_attr: KprobeAttachAttr = get_generic_from_user(attr as usize);
@@ -174,19 +200,31 @@ pub fn sys_bpf_program_attach(attr: *const u8, size: usize) -> i32 {
     convert_result(bpf_program_attach(target_name, attach_attr.prog_fd))
 }
 
+/// wrapper
 pub fn sys_bpf_program_detach(attr: *const u8, size: usize) -> i32 {
     let detach_attr: KprobeAttachAttr = get_generic_from_user(attr as usize);
     trace!("detach fd {}", detach_attr.prog_fd);
     convert_result(bpf_program_detach(detach_attr.prog_fd))
 }
 
-// this is a custome function, so we just copy from rCore
+/// wrapper
+/// this is a custome function, so we just copy from rCore
 pub fn sys_bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> i32 {
     let ret = convert_result(bpf_program_load_ex(prog, &map_info));
     trace!("load ex ret: {}", ret);
     ret
 }
 
+/// # sys_preprocess_bpf_program_load_ex
+/// a wrapper that parse the `attr_ptr` and then call `bpf_program_load_ex`
+/// # argumetns
+/// * attr_ptr - a pointer that should points to a `ProgramLoadExAttr` objects
+/// * size - unused
+/// # procedure
+/// * cast the attr using `get_generic_from_user`
+/// * copy the BPF elf from user space 
+/// * copy the map fd info if there is one
+/// * call `sys_bpf_program_load_ex`
 #[allow(unused_mut)]
 pub fn sys_preprocess_bpf_program_load_ex(attr_ptr: *const u8, size: usize) -> i32 {
 
@@ -219,6 +257,7 @@ pub fn sys_preprocess_bpf_program_load_ex(attr_ptr: *const u8, size: usize) -> i
     sys_bpf_program_load_ex(&mut prog[..], &map_info[..])
 }
 
+/// read a C style string from user space pointed by `ptr`
 unsafe fn read_null_terminated_str(mut ptr: *const u8) -> String {
     let mut ret = String::new();
     loop {

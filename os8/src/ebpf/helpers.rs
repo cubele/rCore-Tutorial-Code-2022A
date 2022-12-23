@@ -2,8 +2,10 @@
 //!
 //! 
 //! those functions are called in bpf kernel programs
+//! 
 //! they need to be relocated in `load_prog` section
-//! see `program.rs`
+//! 
+//! see `program.rs` for details
 
 
 use alloc::string::ToString;
@@ -13,7 +15,7 @@ use super::{
     osutil::*, map::{bpf_map_lookup_elem, bpf_map_update_elem, bpf_map_delete_elem},
 };
 
-/// follow linux convection
+/// follow linux convention
 pub type BpfHelperFn = fn(u64, u64, u64, u64, u64) -> i64;
 
 pub const HELPER_FN_COUNT: usize = 17;
