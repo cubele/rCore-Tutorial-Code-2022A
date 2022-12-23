@@ -1,4 +1,8 @@
 
+//! eBPF maps interal 
+//!
+//! defines the trait the a BPF map the must have
+
 use super::{
     MapAttr,
     BpfResult,
@@ -27,9 +31,13 @@ impl From<MapAttr> for InternalMapAttr {
 }
 
 pub trait BpfMap {
+    /// lookup: get kv
     fn lookup(&self, key: *const u8, value: *mut u8) -> BpfResult;
+    /// update: update or insert v by k
     fn update(&mut self, key: *const u8, value: *const u8, flags: u64) -> BpfResult;
+    /// delete: delete a kv by k
     fn delete(&mut self, key: *const u8) -> BpfResult;
+    /// used when iterate through hashmap
     fn next_key(&self, key: *const u8, next_key: *mut u8) -> BpfResult;
     fn get_attr(&self) -> InternalMapAttr;
 

@@ -1,3 +1,7 @@
+//! eBPF tracepoints
+//!
+//! attach a program to hookpoints
+//! currently we only support Kprobe
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -11,6 +15,7 @@ use super::{BpfObject::*, *, retcode::BpfErrorCode::{*, self}, retcode::*};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
+/// target is the kernel hookpoint symbol name
 pub struct KprobeAttachAttr {
     pub target: *const u8,
     pub str_len: u32,
@@ -54,6 +59,7 @@ fn run_attached_programs(tracepoint: &Tracepoint, ctx: *const u8) {
 }
 
 #[repr(C)]
+/// kProbe context are just registers, or Trapframe
 struct KProbeBPFContext {
     ptype: usize,
     paddr: usize,
@@ -74,6 +80,7 @@ impl KProbeBPFContext {
     }
 }
 
+/// the handler function that passed to register kprobe
 fn kprobe_handler(tf: &mut TrapFrame, probed_addr: usize) -> isize {
     let tracepoint = Tracepoint::new(KProbe, probed_addr);
     let ctx = KProbeBPFContext::new(tf, probed_addr, 0);
@@ -98,6 +105,8 @@ fn kretprobe_exit_handler(tf: &mut TrapFrame, probed_addr: usize) -> isize {
     0
 }
 
+/// since rCore does not support symbol table
+/// we hardcode attached function to syscall::fs::sys_open
 fn resolve_symbol(symbol: &str) -> Option<usize> {
     //addr = 0x0000000080207b4a
     //panic!("resolve symbol need hardcoded symbol")
@@ -124,6 +133,18 @@ fn parse_tracepoint<'a>(target: &'a str) -> Result<(TracepointType, &'a str), Bp
     Ok((tp_type, fn_name))
 }
 
+/// bpf_program_attach
+/// attach a program to a hookpoint
+/// # arguments
+/// * target - a str the represent hookpoiint symbol
+/// * prog_fd - the fd of the bpf program
+/// # prodecure
+/// * get the bpf program object by prog_fd
+/// * get the tracepoint by target name
+/// * add program to tracepoint handlers
+///  if it is the first time a program is attached to, register the kprobe
+/// # return value
+/// * OK(0) on success
 pub fn bpf_program_attach(target: &str, prog_fd: u32) -> BpfResult {
     // check program fd
     let program = {
@@ -185,6 +206,15 @@ pub fn bpf_program_attach(target: &str, prog_fd: u32) -> BpfResult {
     Ok(0)
 }
 
+/// bpf_program_detach
+/// detach a program from hookpoint
+/// # arguments
+/// * prog_fd - the fd of the bpf program
+/// # prodecure
+/// * get the bpf program object by prog_fd
+/// * remove program from tracepoint handlers
+/// # return value
+/// * OK(0) on success
 pub fn bpf_program_detach(prog_fd: u32) -> BpfResult {
     if let Some(prog) = bpf_object_remove(prog_fd) {
         let prog = prog.is_program().unwrap();

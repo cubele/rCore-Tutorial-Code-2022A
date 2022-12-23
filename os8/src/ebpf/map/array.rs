@@ -1,3 +1,9 @@
+//! eBPF array map
+//!
+//! 
+//! a simple array implementation
+//! assume that all pointer are in kernel space
+
 use super::{
     BpfResult,
     retcode::BpfErrorCode::*,
@@ -24,6 +30,8 @@ impl ArrayMap {
         Self { attr, storage }
     }
 
+    /// get element kernel space address by index
+    /// needs to dereference to get the actual value
     fn get_element_addr(&self, index: usize) -> usize {
         let offset = self.attr.value_size * index;
         self.storage.as_ptr() as usize + offset

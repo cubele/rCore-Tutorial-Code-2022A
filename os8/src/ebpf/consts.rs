@@ -1,6 +1,13 @@
-// see Linux kernel source /include/uapi/linux/bpf.h
-
-// eBPF syscall commands
+//! eBPF constants
+//!
+//! 
+//! constants used in eBPF utility, includes
+//! 1. BPF commands 
+//! 2. BPF map types
+//! 3. eBPF LLVM relocations
+//! refer to https://www.kernel.org/doc/html/latest/bpf/llvm_reloc.html
+//! and linux kernel file `bpf.h`, user library libbpf
+  
 use numeric_enum_macro::numeric_enum;
 
 numeric_enum! {
@@ -8,6 +15,7 @@ numeric_enum! {
 
     #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
     #[allow(non_camel_case_types)]
+    /// BPF commands
     pub enum BpfCommand {
         #[allow(non_camel_case_types)]
         BPF_MAP_CREATE = 0,
@@ -23,14 +31,13 @@ numeric_enum! {
 }
 
 
-// eBPF map types
+/// eBPF map types
 pub const BPF_MAP_TYPE_UNSPEC: u32 = 0;
 pub const BPF_MAP_TYPE_HASH: u32 = 1;
 pub const BPF_MAP_TYPE_ARRAY: u32 = 2;
 pub const BPF_MAP_TYPE_PROG_ARRAY: u32 = 3;
 
-// eBPF LLVM relocations
-// see https://www.kernel.org/doc/html/latest/bpf/llvm_reloc.html
+/// eBPF LLVM relocations
 pub const R_BPF_NONE: u32 = 0;
 pub const R_BPF_64_64: u32 = 1;
 pub const R_BPF_64_ABS64: u32 = 2;

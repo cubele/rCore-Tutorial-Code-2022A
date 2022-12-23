@@ -1,3 +1,8 @@
+//! eBPF maps
+//!
+//! 
+//! ebpf map utility
+//! provides interface for map operations
 use lock::Mutex;
 use alloc::sync::Arc;
 
@@ -16,7 +21,8 @@ mod hash;
 
 pub type SharedBpfMap = Arc<Mutex<dyn BpfMap + Send + Sync>>;
 
-// Used by BPF_MAP_CREATE
+/// MapAttr, follows the linux convection
+/// Used by BPF_MAP_CREATE
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct MapAttr {
@@ -26,7 +32,8 @@ pub struct MapAttr {
     pub max_entries: u32,
 }
 
-//  Used by BPF_MAP_*_ELEM and BPF_MAP_GET_NEXT_KEY commands 
+/// MapOpAttr, follows the linux convection
+/// Used by BPF_MAP_*_ELEM and BPF_MAP_GET_NEXT_KEY commands 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct MapOpAttr {
@@ -44,6 +51,12 @@ pub enum BpfMapOp {
     GetNextKey,
 }
 
+/// bpf_map_create
+/// create a bpf map
+/// # arguments
+/// * attr - the map attributes, include key_size, value_size ...s
+/// # return value
+/// * fd of the map created
 pub fn bpf_map_create(attr: MapAttr) -> BpfResult {
     let internal_attr = InternalMapAttr::from(attr);
     match attr.map_type {
@@ -69,10 +82,12 @@ pub fn bpf_map_create(attr: MapAttr) -> BpfResult {
     }
 }
 
+/// remove a map objects
 pub fn bpf_map_close(fd: u32) -> BpfResult {
     bpf_object_remove(fd).map_or(Ok(0), |_| Err(ENOENT))
 }
 
+/// get map attributes
 pub fn bpf_map_get_attr(fd: u32) -> Option<InternalMapAttr> {
     let bpf_objs = BPF_OBJECTS.lock();
     let obj = bpf_objs.get(&fd)?;
@@ -81,6 +96,19 @@ pub fn bpf_map_get_attr(fd: u32) -> Option<InternalMapAttr> {
     Some(attr)
 }
 
+/// bpf_map_ops
+/// wrapper function for map operations
+/// # arguments
+/// * fd - the file descriptor of the map
+/// * op - map operation type, include `lookup`, `delete`, `update`
+/// * key - a pointer to key
+/// * value - a pointer to value
+/// * flags - see linux document for details
+/// * from_user - does key/value points to a user space address, or kernel space address
+/// # procedure
+/// * get the map objects by fd
+/// * does the map operation according to op
+/// * refer to https://livingshade.github.io/ebpf-doc/rcore/#bpf-map-operations for the details
 #[allow(unreachable_patterns)]
 pub fn bpf_map_ops(fd: u32, op: BpfMapOp, key: *const u8, value: *mut u8, flags: u64, from_user: bool) -> BpfResult {
     trace!("bpf map ops fd:{}, op:{:?} key:{:x} value:{:x}", fd, op, key as usize, value as usize);
@@ -127,30 +155,24 @@ pub fn bpf_map_ops(fd: u32, op: BpfMapOp, key: *const u8, value: *mut u8, flags:
     
 }
 
+/// wrapper that calls bpf_map_ops
 pub fn bpf_map_lookup_elem(fd: u32, key: *const u8, value: *mut u8, flags: u64, from_user: bool) -> BpfResult {
     bpf_map_ops(fd, BpfMapOp::LookUp, key, value, flags, from_user)   
 }
 
+/// wrapper that calls bpf_map_ops
 pub fn bpf_map_update_elem(fd: u32, key: *const u8, value: *mut u8, flags: u64, from_user: bool) -> BpfResult {
     bpf_map_ops(fd, BpfMapOp::Update, key, value, flags, from_user)   
 }
 
+/// wrapper that calls bpf_map_ops
 pub fn bpf_map_delete_elem(fd: u32, key: *const u8, value: *mut u8, flags: u64, from_user: bool) -> BpfResult {
     bpf_map_ops(fd, BpfMapOp::Delete, key, value, flags, from_user)   
 }
 
+/// wrapper that calls bpf_map_ops
 pub fn bpf_map_get_next_key(fd: u32, key: *const u8, value: *mut u8, flags: u64, from_user: bool) -> BpfResult {
     bpf_map_ops(fd, BpfMapOp::GetNextKey, key, value, flags, from_user)   
 }
 
-// pub fn bpf_map_lookup_helper(fd: u32, key: *const u8) -> BpfResult {
-//     let bpf_objs = BPF_OBJECTS.lock();
-//     let obj = bpf_objs.get(&fd).ok_or(ENOENT)?;
-//     let shared_map = obj.is_map().ok_or(ENOENT)?;
-//     let map = shared_map.lock();
-//     map.lookup_helper(key)
-// }
 
-
-
-// pub fn bpf_map_update_elem();

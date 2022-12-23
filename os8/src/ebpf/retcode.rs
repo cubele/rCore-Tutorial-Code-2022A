@@ -1,3 +1,6 @@
+//! eBPF retcode
+//!
+//! a wrapper that wrap the unix-style error code to rust Result
 #[allow(dead_code)]
 #[repr(i32)]
 #[derive(Debug, Copy, Clone)]

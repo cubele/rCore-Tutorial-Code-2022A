@@ -1,3 +1,10 @@
+//! eBPF hash map
+//!
+//! 
+//! a hash table implementation
+//! does not differ much from traditional hash index
+//! assume that all pointer are in kernel space
+
 use super::{
     BpfResult,
     consts::*,
@@ -19,6 +26,7 @@ type HashCode = u32;
 type MapKey = Box<[u8]>;
 type MapValue = Box<[u8]>;
 
+/// hash map is internal a BTreeMap
 pub struct HashMap {
     attr: InternalMapAttr,
     map: BTreeMap<HashCode, Vec<(MapKey, MapValue)>>,
@@ -36,6 +44,7 @@ impl HashMap {
         }
     }
 
+    /// get hash value from what kptr points to 
     fn hash(kptr: *const u8, ksize: usize) -> HashCode {
         let seed: HashCode = 131313;
         let mut hash: HashCode = 0;
@@ -45,6 +54,7 @@ impl HashMap {
         hash
     }
 
+    /// find value by key that kptr points to
     fn find(&self, kptr: *const u8) -> Option<&MapValue> {
         let hashcode = HashMap::hash(kptr, self.attr.key_size);
         if let Some(kvlist) = self.map.get(&hashcode) {
@@ -58,6 +68,7 @@ impl HashMap {
         None
     }
 
+    /// rehash 
     fn alloc(size: usize) -> Box<[u8]> {
         let mut storage = Vec::with_capacity(size);
         storage.resize(size, 0u8);
@@ -65,7 +76,7 @@ impl HashMap {
     }
 }
 
-
+/// implement four operations for hashmap
 impl BpfMap for HashMap {
     fn lookup(&self, key: *const u8, value: *mut u8) -> BpfResult {
         if let Some(mv) = self.find(key) {

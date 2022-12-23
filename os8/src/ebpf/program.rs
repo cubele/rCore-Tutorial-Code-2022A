@@ -1,4 +1,7 @@
-
+//! eBPF programs
+//!
+//! load the program into kernel and do the relocation
+ 
 use alloc::string::String;
 use alloc::vec::Vec;
 use xmas_elf;
@@ -33,6 +36,8 @@ pub struct ProgramLoadExAttr {
     pub map_array: *const MapFdEntry,
 }
 
+/// actual defination of BpfProgram
+/// bpf_insns are unused
 pub struct BpfProgram {
     bpf_insns: Option<Vec<u64>>,
     jited_prog: Option<Vec<u32>>, // TODO: should be something like Vec<u8>
@@ -40,7 +45,7 @@ pub struct BpfProgram {
 }
 
 impl BpfProgram {
-    // TODO: run with context
+    /// run cast pointer to a function and runs it
     pub fn run(&self, ctx: *const u8) -> i64 {
         if let Some(compiled_code) = &self.jited_prog {
             let result = unsafe {
@@ -54,7 +59,19 @@ impl BpfProgram {
     }
 }
 
-// #[cfg(target_arch = "riscv64")]
+/// load the bpf program with map config into kernel
+/// # arguments
+/// * `prog` - &mut [u8] the program elf in hexvalue
+/// * `map_info` - [(String, u32)] that store map names and their fd
+/// # procedure
+/// * parse the elf
+/// * build the map fd table
+/// * relocate access to map by map fd table
+/// * relocate helper functions
+/// * JIT the prog
+/// * create BPF objects 
+/// # return value
+/// * fd of the program 
 pub fn bpf_program_load_ex(prog: &mut [u8], map_info: &[(String, u32)]) -> BpfResult {
     trace!("bpf program load ex");
     let _base = prog.as_ptr();
